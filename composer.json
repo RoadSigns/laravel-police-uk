@@ -1,0 +1,20 @@
+{
+    "name": "roadsigns/laravel-police-uk",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Zack",
+            "email": "zack@zacklott.co.uk",
+            "homepage": "https://zack.wales",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php" : "^7.2.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "RoadSigns\\PoliceUK\\": "src"
+        }
+    }
+}
