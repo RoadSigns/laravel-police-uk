@@ -1,10 +1,14 @@
 <?php
 
-namespace RoadSigns\PoliceUK;
+declare(strict_types=1);
 
+namespace RoadSigns\LaravelPoliceUK;
+
+use GuzzleHttp\Client;
 use Illuminate\Support\ServiceProvider;
+use RoadSigns\LaravelPoliceUK\Service\PoliceUKService;
 
-class PoliceUKServiceProvider extends ServiceProvider
+final class PoliceUKServiceProvider extends ServiceProvider
 {
     /**
      * Register services.
@@ -13,16 +17,9 @@ class PoliceUKServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
-    }
-
-    /**
-     * Bootstrap services.
-     *
-     * @return void
-     */
-    public function boot(): void
-    {
-        $this->loadRoutesFrom(__DIR__.'/routes/web.php');
+        $this->app->bind(
+            PoliceUKService::class,
+            fn () => new PoliceUKService(new Client())
+        );
     }
 }
