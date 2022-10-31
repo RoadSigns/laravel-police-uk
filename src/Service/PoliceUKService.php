@@ -20,4 +20,29 @@ final class PoliceUKService
         $this->client = $client;
     }
 
+
+    /**
+     * @return Collection<int, Summary>
+     */
+    public function forces(): Collection
+    {
+        $collection = new Collection();
+        $response = $this->client->get('https://data.police.uk/api/forces');
+
+        try {
+            $content = (array) json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return $collection;
+        }
+
+        $collection->push(
+            ...array_map(
+                static fn (array $force) => new Summary($force['id'], $force['name']),
+                $content
+            )
+        );
+
+        return $collection;
+    }
+
 }
