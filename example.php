@@ -23,3 +23,12 @@ $policeUk->forces()->seniorOfficersByForceId('leicestershire');
 // Get the last time the Crimes were updated
 // https://data.police.uk/docs/method/crime-last-updated/
 $policeUk->crimes()->lastUpdated();
+
+// Get the Crime Categories
+// https://data.police.uk/api/crime-categories
+$policeUk->crimes()->categories();
+
+// Get Crimes with no location
+// https://data.police.uk/api/crimes-no-location?category=all-crime&force=leicestershire&date=2022-09
+$policeUk->crimes()->crimeWithNoLocation('leicestershire');
+
