@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace RoadSigns\LaravelPoliceUK\Service;
 
 use GuzzleHttp\Client;
@@ -70,7 +72,8 @@ final class ForceService
                 json: $response->getBody()->getContents(),
                 associative: true,
                 depth: 512,
-                flags: JSON_THROW_ON_ERROR);
+                flags: JSON_THROW_ON_ERROR
+            );
         } catch (JsonException $jsonException) {
             throw new InvalidForceDataException(
                 message: sprintf('invalid json response for force id %s', $id),
@@ -79,7 +82,7 @@ final class ForceService
             );
         }
 
-        $engagementMethods = array_map(static function($engagementMethod) {
+        $engagementMethods = array_map(static function ($engagementMethod) {
             return new EngagementMethod(
                 title: $engagementMethod['title'],
                 description: $engagementMethod['description'],
@@ -120,7 +123,8 @@ final class ForceService
                 json: $response->getBody()->getContents(),
                 associative: true,
                 depth: 512,
-                flags: JSON_THROW_ON_ERROR);
+                flags: JSON_THROW_ON_ERROR
+            );
         } catch (JsonException $jsonException) {
             throw new InvalidForceDataException(
                 message: sprintf('invalid json response for force id %s', $id),

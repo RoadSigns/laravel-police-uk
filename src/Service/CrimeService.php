@@ -44,6 +44,4 @@ final class CrimeService
 
         return Carbon::createFromFormat('Y-m-d', $content['date']);
     }
-
-
 }

@@ -25,14 +25,12 @@ final class Force
         string $description,
         string $telephone,
         array $engagementMethods
-    )
-    {
+    ) {
         $this->id = $id;
         $this->name = $name;
         $this->url = $url;
         $this->description = strip_tags($description);
         $this->telephone = $telephone;
-
     }
 
     public function id(): string
@@ -59,8 +57,4 @@ final class Force
     {
         return $this->telephone;
     }
-
-
-
-
 }
