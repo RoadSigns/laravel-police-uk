@@ -12,10 +12,13 @@ final class PoliceUKService
 
     private CrimeService $crimeService;
 
+    private NeighbourhoodService $neighbourhoodService;
+
     public function __construct(Client $client)
     {
         $this->forceService = new ForceService($client);
         $this->crimeService = new CrimeService($client);
+        $this->neighbourhoodService = new NeighbourhoodService($client);
     }
 
     public function forces(): ForceService
@@ -28,8 +31,9 @@ final class PoliceUKService
         return $this->crimeService;
     }
 
-    public function neighbourhoods()
+    public function neighbourhoods(): NeighbourhoodService
     {
+        return $this->neighbourhoodService;
     }
 
     public function stopAndSearches()
