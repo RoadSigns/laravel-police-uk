@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use GuzzleHttp\Client;
 use RoadSigns\LaravelPoliceUK\Service\PoliceUKService;
 
@@ -17,3 +19,7 @@ $policeUk->forces()->byForceId('leicestershire');
 // https://data.police.uk/docs/method/senior-officers/
 $policeUk->forces()->seniorOfficersByForceId('leicestershire');
 
+
+// Get the last time the Crimes were updated
+// https://data.police.uk/docs/method/crime-last-updated/
+$policeUk->crimes()->lastUpdated();
