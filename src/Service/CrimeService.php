@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Collection;
+use Psr\Http\Message\ResponseInterface;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Category;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Crime;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Location;
@@ -36,16 +37,7 @@ final class CrimeService
             // Throw Exception
         }
 
-        try {
-            $content = (array) json_decode(
-                json: $response->getBody()->getContents(),
-                associative: true,
-                depth: 512,
-                flags: JSON_THROW_ON_ERROR
-            );
-        } catch (\JsonException $jsonException) {
-            // Throw Exception
-        }
+        $content = $this->getJsonDecode($response);
 
         return Carbon::createFromFormat('Y-m-d', $content['date']);
     }
@@ -66,16 +58,7 @@ final class CrimeService
             // Throw Exception
         }
 
-        try {
-            $content = (array) json_decode(
-                json: $response->getBody()->getContents(),
-                associative: true,
-                depth: 512,
-                flags: JSON_THROW_ON_ERROR
-            );
-        } catch (\JsonException $jsonException) {
-            // Throw Exception
-        }
+        $content = $this->getJsonDecode($response);
 
         return new Collection(...array_map(static function (array $category) {
             return new Category(
@@ -111,16 +94,7 @@ final class CrimeService
             // Throw Exception
         }
 
-        try {
-            $content = (array) json_decode(
-                json: $response->getBody()->getContents(),
-                associative: true,
-                depth: 512,
-                flags: JSON_THROW_ON_ERROR
-            );
-        } catch (\JsonException $jsonException) {
-            // Throw Exception
-        }
+        $content = $this->getJsonDecode($response);
 
         return new Collection(...array_map(static function (array $crime) {
             return new Crime(
@@ -140,5 +114,24 @@ final class CrimeService
                 )
             );
         }, $content));
+    }
+
+    /**
+     * @param ResponseInterface $response
+     * @return array
+     */
+    private function getJsonDecode(ResponseInterface $response): array
+    {
+        try {
+            $content = (array)json_decode(
+                json: $response->getBody()->getContents(),
+                associative: true,
+                depth: 512,
+                flags: JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $jsonException) {
+            // Throw Exception
+        }
+        return $content;
     }
 }

@@ -8,6 +8,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Collection;
 use JsonException;
+use Psr\Http\Message\ResponseInterface;
 use RoadSigns\LaravelPoliceUK\Domain\Forces\Exceptions\ForceNotFoundException;
 use RoadSigns\LaravelPoliceUK\Domain\Forces\Exceptions\InvalidForceDataException;
 use RoadSigns\LaravelPoliceUK\Domain\Forces\Force;
@@ -67,20 +68,7 @@ final class ForceService
             );
         }
 
-        try {
-            $content = (array) json_decode(
-                json: $response->getBody()->getContents(),
-                associative: true,
-                depth: 512,
-                flags: JSON_THROW_ON_ERROR
-            );
-        } catch (JsonException $jsonException) {
-            throw new InvalidForceDataException(
-                message: sprintf('invalid json response for force id %s', $id),
-                code: $jsonException->getCode(),
-                previous: $jsonException
-            );
-        }
+        $content = $this->getJsonDecode($response, $id);
 
         $engagementMethods = array_map(static function ($engagementMethod) {
             return new EngagementMethod(
@@ -118,8 +106,27 @@ final class ForceService
             );
         }
 
+        $content = $this->getJsonDecode($response, $id);
+
+        return new Collection(...array_map(static function (array $officer) {
+            return new SeniorOfficer(
+                name: $officer['name'],
+                rank: $officer['officer'],
+                bio: $officer['bio']
+            );
+        }, $content));
+    }
+
+    /**
+     * @param ResponseInterface $response
+     * @param string $id
+     * @return array
+     * @throws InvalidForceDataException
+     */
+    private function getJsonDecode(ResponseInterface $response, string $id): array
+    {
         try {
-            $content = (array) json_decode(
+            $content = (array)json_decode(
                 json: $response->getBody()->getContents(),
                 associative: true,
                 depth: 512,
@@ -132,13 +139,6 @@ final class ForceService
                 previous: $jsonException
             );
         }
-
-        return new Collection(...array_map(static function (array $officer) {
-            return new SeniorOfficer(
-                name: $officer['name'],
-                rank: $officer['officer'],
-                bio: $officer['bio']
-            );
-        }, $content));
+        return $content;
     }
 }
