@@ -32,3 +32,6 @@ $policeUk->crimes()->categories();
 // https://data.police.uk/api/crimes-no-location?category=all-crime&force=leicestershire&date=2022-09
 $policeUk->crimes()->crimeWithNoLocation('leicestershire');
 
+// Get List of neighbourhoods for a Force id
+// https://data.police.uk/api/leicestershire/neighbourhoods
+$policeUk->neighbourhoods()->byForceId('leicestershire');
