@@ -35,3 +35,7 @@ $policeUk->crimes()->crimeWithNoLocation('leicestershire');
 // Get List of neighbourhoods for a Force id
 // https://data.police.uk/api/leicestershire/neighbourhoods
 $policeUk->neighbourhoods()->byForceId('leicestershire');
+
+// Get Specific Neighbourhood information
+// https://data.police.uk/api/leicestershire/NC04
+$policeUk->neighbourhoods()->neighbourhood('leicestershire', 'NC04');
