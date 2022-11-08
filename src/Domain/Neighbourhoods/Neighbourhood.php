@@ -7,6 +7,7 @@ namespace RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\Centre;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\ContactDetails;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\Link;
+use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\Location;
 
 final class Neighbourhood
 {
@@ -29,7 +30,7 @@ final class Neighbourhood
      */
     private array $links;
 
-    /** @var array<int,  */
+    /** @var array<int, Location> */
     private array $locations;
 
     public function __construct(
@@ -52,6 +53,4 @@ final class Neighbourhood
         $this->links = $links;
         $this->locations = $locations;
     }
-
-
 }

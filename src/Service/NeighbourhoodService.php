@@ -16,7 +16,6 @@ use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\ContactDetails;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\Link;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\Location;
 
-
 final class NeighbourhoodService
 {
     private Client $client;
@@ -76,47 +75,47 @@ final class NeighbourhoodService
 
         $content = $this->getJsonDecode($response);
 
-       return new Neighbourhood(
-           summary: new Summary(
-               id: $content['id'],
-               name: $content['name']
-           ),
-           urlForce: $content['url_force'],
-           description: $content['description'],
-           population: $content['population'],
-           contactDetails: new ContactDetails(
-               email: $content['contact_details']['email'] ?? '',
-               telephone: $content['contact_details']['telephone'] ?? '',
-               mobile: $content['contact_details']['mobile'] ?? '',
-               web: $content['contact_details']['web'] ?? '',
-               facebook: $content['contact_details']['facebook'] ?? '',
-               twitter: $content['contact_details']['twitter'] ?? '',
-               youtube: $content['contact_details']['youtube'] ?? '',
-           ),
-           centre: new Centre(
-               longitude: (float) $content['centre']['longitude'],
-               latitude: (float) $content['centre']['latitude']
-           ),
-           links: array_map(static function (array $link): Link {
-               return new Link(
-                   title: $link['title'],
-                   url: $link['url'],
-                   description: $link['description']
-               );
-           }, $content['links']),
-           locations: array_map(static function (array $location): Location {
-               return new Location(
-                   name: $location['name'],
-                   type: $location['type'],
-                   telephone: $location['telephone'],
-                   address: $location['address'],
-                   postCode: $location['postcode'],
-                   latitude: (float) $location['latitude'],
-                   longitude: (float) $location['longitude'],
-                   description: $location['description']
-               );
-           }, $content['locations'])
-       );
+        return new Neighbourhood(
+            summary: new Summary(
+                id: $content['id'],
+                name: $content['name']
+            ),
+            urlForce: $content['url_force'],
+            description: $content['description'],
+            population: $content['population'],
+            contactDetails: new ContactDetails(
+                email: $content['contact_details']['email'] ?? '',
+                telephone: $content['contact_details']['telephone'] ?? '',
+                mobile: $content['contact_details']['mobile'] ?? '',
+                web: $content['contact_details']['web'] ?? '',
+                facebook: $content['contact_details']['facebook'] ?? '',
+                twitter: $content['contact_details']['twitter'] ?? '',
+                youtube: $content['contact_details']['youtube'] ?? '',
+            ),
+            centre: new Centre(
+                longitude: (float) $content['centre']['longitude'],
+                latitude: (float) $content['centre']['latitude']
+            ),
+            links: array_map(static function (array $link): Link {
+                return new Link(
+                    title: $link['title'],
+                    url: $link['url'],
+                    description: $link['description']
+                );
+            }, $content['links']),
+            locations: array_map(static function (array $location): Location {
+                return new Location(
+                    name: $location['name'],
+                    type: $location['type'],
+                    telephone: $location['telephone'],
+                    address: $location['address'],
+                    postCode: $location['postcode'],
+                    latitude: (float) $location['latitude'],
+                    longitude: (float) $location['longitude'],
+                    description: $location['description']
+                );
+            }, $content['locations'])
+        );
     }
 
     /**
@@ -133,8 +132,9 @@ final class NeighbourhoodService
                 flags: JSON_THROW_ON_ERROR
             );
         } catch (\JsonException $jsonException) {
-            // Throw Exception
+            throw $jsonException;
         }
+
         return $content;
     }
 }

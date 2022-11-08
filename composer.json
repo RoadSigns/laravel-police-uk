@@ -18,7 +18,8 @@
         "orchestra/testbench": "6.*",
         "phpunit/phpunit": "^9.0",
         "roave/security-advisories": "dev-latest",
-        "symplify/easy-coding-standard": "^11.1"
+        "symplify/easy-coding-standard": "^11.1",
+        "phpstan/phpstan": "^1.8"
     },
     "autoload": {
         "psr-4": {
@@ -27,7 +28,9 @@
     },
     "scripts": {
         "test": "vendor/bin/phpunit --colors=always",
-        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage",
+        "cs-test": "ecs check src tests",
+        "cs-fix": "ecs check src tests --fix"
     },
     "config": {
         "sort-packages": true

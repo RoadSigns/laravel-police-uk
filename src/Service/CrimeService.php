@@ -11,6 +11,7 @@ use Illuminate\Support\Collection;
 use Psr\Http\Message\ResponseInterface;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Category;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Crime;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\Exceptions\CrimeServiceException;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Location;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\OutcomeStatus;
 
@@ -28,18 +29,34 @@ final class CrimeService
      * The day is irrelevant and is only there to keep a standard formatted date.
      *
      * @return Carbon
+     * @throws CrimeServiceException
      */
     public function lastUpdated(): Carbon
     {
         try {
             $response = $this->client->get('https://data.police.uk/api/crime-last-updated');
         } catch (GuzzleException $guzzleException) {
-            // Throw Exception
+            throw new CrimeServiceException(
+                message: 'unable to get last updated information',
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
         }
 
         $content = $this->getJsonDecode($response);
 
-        return Carbon::createFromFormat('Y-m-d', $content['date']);
+        try {
+            $date = Carbon::createFromFormat('Y-m-d', $content['date']);
+            assert($date instanceof Carbon);
+        } catch (\Throwable $throwable) {
+            throw new CrimeServiceException(
+                message: 'unable to parse last updated date',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $date;
     }
 
     /**
@@ -55,7 +72,11 @@ final class CrimeService
         try {
             $response = $this->client->get($url);
         } catch (GuzzleException $guzzleException) {
-            // Throw Exception
+            throw new CrimeServiceException(
+                message: 'unable to get categories',
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
         }
 
         $content = $this->getJsonDecode($response);
@@ -91,7 +112,11 @@ final class CrimeService
         try {
             $response = $this->client->get($url);
         } catch (GuzzleException $guzzleException) {
-            // Throw Exception
+            throw new CrimeServiceException(
+                message: 'unable to get crimes with no location',
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
         }
 
         $content = $this->getJsonDecode($response);
@@ -130,7 +155,11 @@ final class CrimeService
                 flags: JSON_THROW_ON_ERROR
             );
         } catch (\JsonException $jsonException) {
-            // Throw Exception
+            throw new CrimeServiceException(
+                message: 'unable to parse json response',
+                code: $jsonException->getCode(),
+                previous: $jsonException
+            );
         }
         return $content;
     }

@@ -18,6 +18,8 @@ final class Force
 
     private string $telephone;
 
+    private array $engagementMethods;
+
     public function __construct(
         string $id,
         string $name,
@@ -31,6 +33,7 @@ final class Force
         $this->url = $url;
         $this->description = strip_tags($description);
         $this->telephone = $telephone;
+        $this->engagementMethods = $engagementMethods;
     }
 
     public function id(): string
@@ -56,5 +59,10 @@ final class Force
     public function telephone(): string
     {
         return $this->telephone;
+    }
+
+    public function engagementMethods(): array
+    {
+        return $this->engagementMethods;
     }
 }
