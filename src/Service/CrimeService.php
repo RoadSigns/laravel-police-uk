@@ -133,24 +133,36 @@ final class CrimeService
 
         $content = $this->getJsonDecode($response);
 
-        return new Collection(...array_map(static function (array $crime) {
-            return new Crime(
-                id: $crime['id'],
-                persistentId: $crime['persistent_id'],
-                category: $crime['category'],
-                context: $crime['context'],
-                month: Carbon::createFromFormat('Y-m', $crime['month']),
-                location: new Location(
-                    title: $crime['location'] ?? '',
-                    type: $crime['location_type'] ?? '',
-                    subtype: $crime['location_subtype'] ?? ''
-                ),
-                outcomeStatus: new OutcomeStatus(
-                    category: $crime['outcome_status']['category'],
-                    date: Carbon::createFromFormat('Y-m', $crime['outcome_status']['date'])
-                )
+        try {
+            $crimes = new Collection(
+                array_map(static function (array $crime) {
+                    return new Crime(
+                        id: $crime['id'],
+                        persistentId: $crime['persistent_id'],
+                        category: $crime['category'],
+                        context: $crime['context'],
+                        month: Carbon::createFromFormat('Y-m', $crime['month']),
+                        location: new Location(
+                            title: $crime['location'] ?? '',
+                            type: $crime['location_type'] ?? '',
+                            subtype: $crime['location_subtype'] ?? ''
+                        ),
+                        outcomeStatus: new OutcomeStatus(
+                            category: $crime['outcome_status']['category'],
+                            date: Carbon::createFromFormat('Y-m', $crime['outcome_status']['date'])
+                        )
+                    );
+                }, $content)
             );
-        }, $content));
+        } catch (\Throwable $throwable) {
+            throw new CrimeServiceException(
+                message: 'unable to parse crimes with no location',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $crimes;
     }
 
     /**

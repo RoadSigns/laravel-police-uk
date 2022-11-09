@@ -11,6 +11,7 @@ use GuzzleHttp\Psr7\Stream;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Category;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\Crime;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Exceptions\CrimeServiceException;
 use RoadSigns\LaravelPoliceUK\Service\CrimeService;
 
@@ -257,5 +258,130 @@ final class CrimeServiceTest extends TestCase
         $category = $categories->first();
         $this->assertSame("All crime and ASB", $category->name());
         $this->assertSame("all-crime", $category->url());
+    }
+
+    /** @test */
+    public function throwsAnExceptionWhenUnableToGetTheCrimes(): void
+    {
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willThrowException(
+                $this->createMock(GuzzleException::class)
+            );
+
+        $this->expectException(CrimeServiceException::class);
+        $this->expectExceptionMessage('unable to get crimes with no location');
+
+        $crimeService = new CrimeService($client);
+        $crimeService->crimeWithNoLocation('leicestershire');
+    }
+
+    /** @test */
+    public function throwsAnExceptionWhenUnableToParseTheCrimes(): void
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $this->expectException(CrimeServiceException::class);
+        $this->expectExceptionMessage('unable to parse json response');
+
+        $crimeService = new CrimeService($client);
+        $crimeService->crimeWithNoLocation('leicestershire');
+    }
+
+    /** @test */
+    public function throwsAnExceptionWhenUnableToParseTheCrimesResponse(): void
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"}');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $this->expectException(CrimeServiceException::class);
+        $this->expectExceptionMessage('unable to parse crimes with no location');
+
+        $crimeService = new CrimeService($client);
+        $crimeService->crimeWithNoLocation('leicestershire');
+    }
+
+    /** @test */
+    public function canGetTheCrimes(): void
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn(
+            '
+            [
+                {
+                    "category": "burglary", 
+                    "persistent_id": "4ea1d4da29bd8b9e362af35cbabb6157149f62b65d37486dffd185a18e1aaadd", 
+                    "location_subtype": "", 
+                    "id": 56862854, 
+                    "location": null, 
+                    "context": "", 
+                    "month": "2017-03", 
+                    "location_type": null, 
+                    "outcome_status": {
+                        "category": "Investigation complete; no suspect identified", 
+                        "date": "2017-03"
+                    }
+                }, 
+                {
+                    "category": "criminal-damage-arson", 
+                    "persistent_id": "979f2338f25f62196268b52c8405ca8ff431fd2fb02ab11b2192c479816547e5", 
+                    "location_subtype": "", 
+                    "id": 56866806, 
+                    "location": null, 
+                    "context": "", 
+                    "month": "2017-03", 
+                    "location_type": null, 
+                    "outcome_status": {
+                        "category": "Under investigation", 
+                        "date": "2017-03"
+                    }
+                }
+            ]
+        '
+        );
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $crimeService = new CrimeService($client);
+        $crimes = $crimeService->crimeWithNoLocation('leicestershire');
+
+        $this->assertSame(2, $crimes->count());
+
+        /** @var Crime $crime */
+        $crime = $crimes->first();
+        $this->assertSame("burglary", $crime->category());
+        $this->assertSame("4ea1d4da29bd8b9e362af35cbabb6157149f62b65d37486dffd185a18e1aaadd", $crime->persistentId());
+        $this->assertSame(56862854, $crime->id());
+        $this->assertSame("", $crime->context());
+        $this->assertSame("2017-03", $crime->month()->format('Y-m'));
+        $this->assertSame("Investigation complete; no suspect identified", $crime->outcomeStatus()->category());
+        $this->assertSame("2017-03", $crime->outcomeStatus()->date()->format('Y-m'));
+        $this->assertSame("", $crime->location()->title());
+        $this->assertSame("", $crime->location()->type());
+        $this->assertSame("", $crime->location()->subtype());
     }
 }
