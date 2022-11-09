@@ -81,12 +81,24 @@ final class CrimeService
 
         $content = $this->getJsonDecode($response);
 
-        return new Collection(...array_map(static function (array $category) {
-            return new Category(
-                url: $category['url'],
-                name: $category['name']
+        try {
+            $categories = new Collection(
+                array_map(static function (array $category) {
+                    return new Category(
+                        url: $category['url'],
+                        name: $category['name']
+                    );
+                }, $content)
             );
-        }, $content));
+        } catch (\Throwable $throwable) {
+            throw new CrimeServiceException(
+                message: 'unable to parse categories',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $categories;
     }
 
     /**

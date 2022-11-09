@@ -16,12 +16,12 @@ final class Category
         $this->name = $name;
     }
 
-    public function getUrl(): string
+    public function url(): string
     {
         return $this->url;
     }
 
-    public function getName(): string
+    public function name(): string
     {
         return $this->name;
     }
