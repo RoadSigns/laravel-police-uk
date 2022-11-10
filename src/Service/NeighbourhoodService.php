@@ -8,7 +8,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Collection;
 use Psr\Http\Message\ResponseInterface;
-use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Exceptions\NeighbourhoodsNotFoundException;
+use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Exceptions\NeighbourhoodServiceException;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Neighbourhood;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Summary;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\Centre;
@@ -28,14 +28,14 @@ final class NeighbourhoodService
     /**
      * @param string $forceId
      * @return Collection<int, Summary>
-     * @throws NeighbourhoodsNotFoundException
+     * @throws NeighbourhoodServiceException
      */
     public function byForceId(string $forceId): Collection
     {
         try {
             $response = $this->client->get(sprintf('https://data.police.uk/api/%s/neighbourhoods', $forceId));
         } catch (GuzzleException $guzzleException) {
-            throw new NeighbourhoodsNotFoundException(
+            throw new NeighbourhoodServiceException(
                 message: sprintf('unable to find neighbourhoods with id of %s', $forceId),
                 code: $guzzleException->getCode(),
                 previous: $guzzleException
@@ -44,16 +44,28 @@ final class NeighbourhoodService
 
         $content = $this->getJsonDecode($response);
 
-        return new Collection(...array_map(static function (array $summary) {
-            return new Summary(
-                id: $summary['id'],
-                name: $summary['name']
+        try {
+            $neighbourhoodSummaries = new Collection(
+                array_map(static function (array $summary) {
+                    return new Summary(
+                        id: $summary['id'],
+                        name: $summary['name']
+                    );
+                }, $content)
             );
-        }, $content));
+        } catch (\Throwable $throwable) {
+            throw new NeighbourhoodServiceException(
+                message: 'unable to parse neighbourhood summaries',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $neighbourhoodSummaries;
     }
 
     /**
-     * @throws NeighbourhoodsNotFoundException
+     * @throws NeighbourhoodServiceException
      */
     public function neighbourhood(string $forceId, string $neighbourhoodId): Neighbourhood
     {
@@ -62,7 +74,7 @@ final class NeighbourhoodService
                 sprintf('https://data.police.uk/api/%s/%s', $forceId, $neighbourhoodId)
             );
         } catch (GuzzleException $guzzleException) {
-            throw new NeighbourhoodsNotFoundException(
+            throw new NeighbourhoodServiceException(
                 message: sprintf(
                     'unable to find neighbourhood with  force id of %s and id of %s',
                     $forceId,
@@ -132,7 +144,11 @@ final class NeighbourhoodService
                 flags: JSON_THROW_ON_ERROR
             );
         } catch (\JsonException $jsonException) {
-            throw $jsonException;
+            throw new NeighbourhoodServiceException(
+                message: 'unable to decode json',
+                code: $jsonException->getCode(),
+                previous: $jsonException
+            );
         }
 
         return $content;
