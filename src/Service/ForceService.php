@@ -26,7 +26,7 @@ final class ForceService
 
     /**
      * @return Collection<int, Summary>
-     * @throws GuzzleException
+     * @throws ForceServiceException
      */
     public function all(): Collection
     {
@@ -46,7 +46,7 @@ final class ForceService
         try {
             $collection->push(
                 ...array_map(
-                    static fn(array $force) => new Summary($force['id'], $force['name']),
+                    static fn (array $force) => new Summary($force['id'], $force['name']),
                     $content
                 )
             );
@@ -78,24 +78,34 @@ final class ForceService
             );
         }
 
-        $content = $this->getJsonDecode($response, $id);
+        $content = $this->getJsonDecode($response);
 
-        $engagementMethods = array_map(static function ($engagementMethod) {
-            return new EngagementMethod(
-                title: $engagementMethod['title'],
-                description: $engagementMethod['description'],
-                url: $engagementMethod['url']
+        try {
+            $engagementMethods = array_map(static function ($engagementMethod) {
+                return new EngagementMethod(
+                    title: $engagementMethod['title'] ?? '',
+                    description: $engagementMethod['description'] ?? '',
+                    url: $engagementMethod['url'] ?? ''
+                );
+            }, $content['engagement_methods'] ?? []);
+
+            $force = new Force(
+                id: $content['id'],
+                name: $content['name'],
+                url: $content['url'] ?? '',
+                description: $content['description'] ?? '',
+                telephone: $content['telephone'] ?? '',
+                engagementMethods: $engagementMethods
             );
-        }, $content['engagement_methods'] ?? []);
+        } catch (\Throwable $throwable) {
+            throw new ForceServiceException(
+                message: sprintf('unable to parse force with id of %s', $id),
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
 
-        return new Force(
-            id: $content['id'],
-            name: $content['name'],
-            url: $content['url'],
-            description: $content['description'],
-            telephone: $content['telephone'],
-            engagementMethods: $engagementMethods
-        );
+        return $force;
     }
 
     /**
@@ -109,21 +119,33 @@ final class ForceService
             $response = $this->client->get('https://data.police.uk/api/forces/' . $id . '/people');
         } catch (GuzzleException $guzzleException) {
             throw new ForceServiceException(
-                message: sprintf('unable to find force with id of %s', $id),
+                message: sprintf('unable to find senior officers for force with id of %s', $id),
                 code: $guzzleException->getCode(),
                 previous: $guzzleException
             );
         }
 
-        $content = $this->getJsonDecode($response, $id);
+        $content = $this->getJsonDecode($response);
 
-        return new Collection(...array_map(static function (array $officer) {
-            return new SeniorOfficer(
-                name: $officer['name'],
-                rank: $officer['officer'],
-                bio: $officer['bio']
+        try {
+            $seniorOfficers = new Collection(
+                array_map(static function (array $officer) {
+                    return new SeniorOfficer(
+                        name: $officer['name'],
+                        rank: $officer['rank'],
+                        bio: $officer['bio']
+                    );
+                }, $content)
             );
-        }, $content));
+        } catch (\Throwable $throwable) {
+            throw new ForceServiceException(
+                message: sprintf('unable to parse senior officers for force with id of %s', $id),
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $seniorOfficers;
     }
 
     /**
@@ -134,7 +156,7 @@ final class ForceService
     private function getJsonDecode(ResponseInterface $response): array
     {
         try {
-            $content = (array)json_decode(
+            $content = (array) json_decode(
                 json: $response->getBody()->getContents(),
                 associative: true,
                 depth: 512,
