@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace RoadSigns\LaravelPoliceUK\Service;
 
+use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Collection;
 use Psr\Http\Message\ResponseInterface;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Exceptions\NeighbourhoodServiceException;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Neighbourhood;
+use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Priority;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Summary;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\Centre;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\ContactDetails;
@@ -138,6 +140,55 @@ final class NeighbourhoodService
         }
 
         return $neighbourhood;
+    }
+
+    public function priorities(string $forceId, string $neighbourhoodId): Collection
+    {
+        try {
+            $response = $this->client->get(
+                sprintf('https://data.police.uk/api/%s/%s/priorities', $forceId, $neighbourhoodId)
+            );
+        } catch (GuzzleException $guzzleException) {
+            throw new NeighbourhoodServiceException(
+                message: sprintf(
+                    'unable to find neighbourhood priorities with force id of %s and id of %s',
+                    $forceId,
+                    $neighbourhoodId
+                ),
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
+        }
+
+        $content = $this->getJsonDecode($response);
+
+        try {
+            $priorities = new Collection(
+                array_map(static function (array $priority) {
+                    $actionDate = is_null($priority['action-date'])
+                        ? null
+                        : Carbon::createFromFormat(
+                            format: 'Y-m-d\TH:i:s',
+                            time: $priority['action-date']
+                        );
+
+                    return new Priority(
+                        issue: $priority['issue'] ?? '',
+                        issueDate: Carbon::createFromFormat('Y-m-d\TH:i:s', $priority['issue-date']),
+                        action: $priority['action'] ?? '',
+                        actionDate: $actionDate,
+                    );
+                }, $content)
+            );
+        } catch (\Throwable $throwable) {
+            throw new NeighbourhoodServiceException(
+                message: 'unable to parse neighbourhood priorities',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $priorities;
     }
 
     /**
