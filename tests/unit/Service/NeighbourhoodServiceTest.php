@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace unit\Service;
 
 use GuzzleHttp\Client;
@@ -11,7 +13,7 @@ use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Exceptions\NeighbourhoodServ
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Neighbourhood;
 use RoadSigns\LaravelPoliceUK\Service\NeighbourhoodService;
 
-class NeighbourhoodServiceTest extends TestCase
+final class NeighbourhoodServiceTest extends TestCase
 {
     /** @test */
     public function throwsExceptionWhenNeighbourhoodsNotFound(): void

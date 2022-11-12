@@ -9,8 +9,7 @@ use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Collection;
 use JsonException;
 use Psr\Http\Message\ResponseInterface;
-use RoadSigns\LaravelPoliceUK\Domain\Forces\Exceptions\ForceNotFoundException;
-use RoadSigns\LaravelPoliceUK\Domain\Forces\Exceptions\InvalidForceDataException;
+use RoadSigns\LaravelPoliceUK\Domain\Forces\Exceptions\ForceServiceException;
 use RoadSigns\LaravelPoliceUK\Domain\Forces\Force;
 use RoadSigns\LaravelPoliceUK\Domain\Forces\SeniorOfficer;
 use RoadSigns\LaravelPoliceUK\Domain\Forces\Summary;
@@ -32,20 +31,32 @@ final class ForceService
     public function all(): Collection
     {
         $collection = new Collection();
-        $response = $this->client->get('https://data.police.uk/api/forces');
-
         try {
-            $content = (array) json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return $collection;
+            $response = $this->client->get('https://data.police.uk/api/forces');
+        } catch (GuzzleException $exception) {
+            throw new ForceServiceException(
+                message: 'unable to find forces',
+                code: 0,
+                previous: $exception
+            );
         }
 
-        $collection->push(
-            ...array_map(
-                static fn (array $force) => new Summary($force['id'], $force['name']),
-                $content
-            )
-        );
+        $content = $this->getJsonDecode($response);
+
+        try {
+            $collection->push(
+                ...array_map(
+                    static fn(array $force) => new Summary($force['id'], $force['name']),
+                    $content
+                )
+            );
+        } catch (\Throwable $throwable) {
+            throw new ForceServiceException(
+                message: 'unable to parse forces',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
 
         return $collection;
     }
@@ -53,15 +64,14 @@ final class ForceService
     /**
      * @param string $id
      * @return Force
-     * @throws ForceNotFoundException
-     * @throws InvalidForceDataException
+     * @throws ForceServiceException
      */
     public function byForceId(string $id): Force
     {
         try {
             $response = $this->client->get('https://data.police.uk/api/forces/' . $id);
         } catch (GuzzleException $guzzleException) {
-            throw new ForceNotFoundException(
+            throw new ForceServiceException(
                 message: sprintf('unable to find force with id of %s', $id),
                 code: $guzzleException->getCode(),
                 previous: $guzzleException
@@ -91,15 +101,14 @@ final class ForceService
     /**
      * @param string $id
      * @return Collection<int, SeniorOfficer>
-     * @throws ForceNotFoundException
-     * @throws InvalidForceDataException
+     * @throws ForceServiceException
      */
     public function seniorOfficersByForceId(string $id): Collection
     {
         try {
             $response = $this->client->get('https://data.police.uk/api/forces/' . $id . '/people');
         } catch (GuzzleException $guzzleException) {
-            throw new ForceNotFoundException(
+            throw new ForceServiceException(
                 message: sprintf('unable to find force with id of %s', $id),
                 code: $guzzleException->getCode(),
                 previous: $guzzleException
@@ -119,11 +128,10 @@ final class ForceService
 
     /**
      * @param ResponseInterface $response
-     * @param string $id
      * @return array
-     * @throws InvalidForceDataException
+     * @throws ForceServiceException
      */
-    private function getJsonDecode(ResponseInterface $response, string $id): array
+    private function getJsonDecode(ResponseInterface $response): array
     {
         try {
             $content = (array)json_decode(
@@ -133,12 +141,13 @@ final class ForceService
                 flags: JSON_THROW_ON_ERROR
             );
         } catch (JsonException $jsonException) {
-            throw new InvalidForceDataException(
-                message: sprintf('invalid json response for force id %s', $id),
+            throw new ForceServiceException(
+                message: sprintf('unable to decode json'),
                 code: $jsonException->getCode(),
                 previous: $jsonException
             );
         }
+
         return $content;
     }
 }
