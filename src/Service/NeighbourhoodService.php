@@ -9,6 +9,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Collection;
 use Psr\Http\Message\ResponseInterface;
+use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Event;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Exceptions\NeighbourhoodServiceException;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Neighbourhood;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Priority;
@@ -189,6 +190,50 @@ final class NeighbourhoodService
         }
 
         return $priorities;
+    }
+
+    public function events(string $forceId, string $neighbourhoodId): Collection
+    {
+        try {
+            $response = $this->client->get(
+                sprintf('https://data.police.uk/api/%s/%s/events', $forceId, $neighbourhoodId)
+            );
+        } catch (GuzzleException $guzzleException) {
+            throw new NeighbourhoodServiceException(
+                message: sprintf(
+                    'unable to find neighbourhood events with force id of %s and id of %s',
+                    $forceId,
+                    $neighbourhoodId
+                ),
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
+        }
+
+        $content = $this->getJsonDecode($response);
+
+        try {
+            $events = new Collection(
+                array_map(static function (array $event) {
+                    return new Event(
+                        title: $event['title'] ?? '',
+                        description: $event['description'] ?? '',
+                        type: $event['type'] ?? '',
+                        address: $event['address'] ?? '',
+                        startDate: Carbon::createFromFormat('Y-m-d\TH:i:s', $event['start_date']),
+                        endDate: Carbon::createFromFormat('Y-m-d\TH:i:s', $event['end_date']),
+                    );
+                }, $content)
+            );
+        } catch (\Throwable $throwable) {
+            throw new NeighbourhoodServiceException(
+                message: 'unable to parse neighbourhood events',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $events;
     }
 
     /**

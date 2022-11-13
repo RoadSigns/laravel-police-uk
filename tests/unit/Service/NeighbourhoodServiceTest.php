@@ -312,4 +312,97 @@ final class NeighbourhoodServiceTest extends TestCase
         $priorities = $service->priorities('leicestershire', 'NC04');
         $this->assertCount(2, $priorities);
     }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToGetNeighbourhoodEvents(): void
+    {
+        $this->expectException(NeighbourhoodServiceException::class);
+        $this->expectExceptionMessage(
+            'unable to find neighbourhood events with force id of leicestershire and id of NC04'
+        );
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/leicestershire/NC04/events')
+            ->willThrowException($this->createMock(GuzzleException::class));
+
+        $service = new NeighbourhoodService($client);
+        $service->events('leicestershire', 'NC04');
+    }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToParseNeighbourhoodEvents(): void
+    {
+        $this->expectException(NeighbourhoodServiceException::class);
+        $this->expectExceptionMessage('unable to decode json');
+
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/leicestershire/NC04/events')
+            ->willReturn($response);
+
+        $service = new NeighbourhoodService($client);
+        $service->events('leicestershire', 'NC04');
+    }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToParseNeighbourhoodEventsInformation(): void
+    {
+        $this->expectException(NeighbourhoodServiceException::class);
+        $this->expectExceptionMessage('unable to parse neighbourhood events');
+
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"}');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/leicestershire/NC04/events')
+            ->willReturn($response);
+
+        $service = new NeighbourhoodService($client);
+        $service->events('leicestershire', 'NC04');
+    }
+
+    /** @test */
+    public function returnsNeighbourhoodEvents(): void
+    {
+        $json = '[
+             {
+                "contact_details": {},
+                "description": null,
+                "title": "Drop In Beat Surgery",
+                "address": "Nagarjuna Buddhist Centre, 17 Guildhall Lane",
+                "type": "meeting",
+                "start_date": "2016-09-17T12:00:00",
+                "end_date": "2016-09-17T14:00:00"
+            }
+        ]';
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn($json);
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/leicestershire/NC04/events')
+            ->willReturn($response);
+
+        $service = new NeighbourhoodService($client);
+        $events = $service->events('leicestershire', 'NC04');
+        $this->assertCount(1, $events);
+    }
 }
