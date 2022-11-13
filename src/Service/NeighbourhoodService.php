@@ -11,6 +11,7 @@ use Illuminate\Support\Collection;
 use Psr\Http\Message\ResponseInterface;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Event;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Exceptions\NeighbourhoodServiceException;
+use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\LocateNeighbourhood;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Neighbourhood;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Priority;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Summary;
@@ -143,6 +144,12 @@ final class NeighbourhoodService
         return $neighbourhood;
     }
 
+    /**
+     * @param string $forceId
+     * @param string $neighbourhoodId
+     * @return Collection<int, Priority>
+     * @throws NeighbourhoodServiceException
+     */
     public function priorities(string $forceId, string $neighbourhoodId): Collection
     {
         try {
@@ -192,6 +199,12 @@ final class NeighbourhoodService
         return $priorities;
     }
 
+    /**
+     * @param string $forceId
+     * @param string $neighbourhoodId
+     * @return Collection<int, Event>
+     * @throws NeighbourhoodServiceException
+     */
     public function events(string $forceId, string $neighbourhoodId): Collection
     {
         try {
@@ -234,6 +247,45 @@ final class NeighbourhoodService
         }
 
         return $events;
+    }
+
+    /**
+     * @throws NeighbourhoodServiceException
+     */
+    public function locate(float $latitude, float $longitude): LocateNeighbourhood
+    {
+        try {
+            $response = $this->client->get(
+                sprintf('https://data.police.uk/api/locate-neighbourhood?q=%s,%s', $latitude, $longitude)
+            );
+        } catch (GuzzleException $guzzleException) {
+            throw new NeighbourhoodServiceException(
+                message: sprintf(
+                    'unable to find neighbourhood with latitude of %s and longitude of %s',
+                    $latitude,
+                    $longitude
+                ),
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
+        }
+
+        $content = $this->getJsonDecode($response);
+
+        try {
+            $locateNeighbourhood = new LocateNeighbourhood(
+                forceId: $content['force'],
+                neighbourhoodId: $content['neighbourhood']
+            );
+        } catch (\Throwable $throwable) {
+            throw new NeighbourhoodServiceException(
+                message: 'unable to parse neighbourhood',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $locateNeighbourhood;
     }
 
     /**

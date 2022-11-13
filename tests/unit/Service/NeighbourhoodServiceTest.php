@@ -405,4 +405,91 @@ final class NeighbourhoodServiceTest extends TestCase
         $events = $service->events('leicestershire', 'NC04');
         $this->assertCount(1, $events);
     }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToGetLocateNeighbourhood(): void
+    {
+        $this->expectException(NeighbourhoodServiceException::class);
+        $this->expectExceptionMessage(
+            'unable to find neighbourhood with latitude of 0 and longitude of 0'
+        );
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/locate-neighbourhood?q=0,0')
+            ->willThrowException($this->createMock(GuzzleException::class));
+
+        $service = new NeighbourhoodService($client);
+        $service->locate(0.0, 0.0);
+    }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToParseLocateNeighbourhood(): void
+    {
+        $this->expectException(NeighbourhoodServiceException::class);
+        $this->expectExceptionMessage('unable to decode json');
+
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/locate-neighbourhood?q=0,0')
+            ->willReturn($response);
+
+        $service = new NeighbourhoodService($client);
+        $service->locate(0.0, 0.0);
+    }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToParseLocateNeighbourhoodInformation(): void
+    {
+        $this->expectException(NeighbourhoodServiceException::class);
+        $this->expectExceptionMessage('unable to parse neighbourhood');
+
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"}');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/locate-neighbourhood?q=0,0')
+            ->willReturn($response);
+
+        $service = new NeighbourhoodService($client);
+        $service->locate(0.0, 0.0);
+    }
+
+    /** @test */
+    public function returnsLocateNeighbourhood(): void
+    {
+        $json = '{
+            "force": "leicestershire",
+            "neighbourhood": "NC04"
+        }';
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn($json);
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/locate-neighbourhood?q=0,0')
+            ->willReturn($response);
+
+        $service = new NeighbourhoodService($client);
+        $neighbourhood = $service->locate(0.0, 0.0);
+        $this->assertSame('leicestershire', $neighbourhood->forceId());
+        $this->assertSame('NC04', $neighbourhood->neighbourhoodId());
+    }
 }
