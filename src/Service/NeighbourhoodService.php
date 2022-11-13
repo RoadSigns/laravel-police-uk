@@ -13,6 +13,7 @@ use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Event;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Exceptions\NeighbourhoodServiceException;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\LocateNeighbourhood;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Neighbourhood;
+use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Person;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Priority;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Summary;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\ValueObjects\Centre;
@@ -286,6 +287,47 @@ final class NeighbourhoodService
         }
 
         return $locateNeighbourhood;
+    }
+
+    public function people(string $forceId, string $neighbourhoodId): Collection
+    {
+        try {
+            $response = $this->client->get(
+                sprintf('https://data.police.uk/api/%s/%s/people', $forceId, $neighbourhoodId)
+            );
+        } catch (GuzzleException $guzzleException) {
+            throw new NeighbourhoodServiceException(
+                message: sprintf(
+                    'unable to find people for force %s and neighbourhood %s',
+                    $forceId,
+                    $neighbourhoodId
+                ),
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
+        }
+
+        $content = $this->getJsonDecode($response);
+
+        try {
+            $people = new Collection(
+                array_map(static function (array $person) {
+                    return new Person(
+                        name: $person['name'],
+                        rank: $person['rank'],
+                        bio: $person['bio'] ?? ''
+                    );
+                }, $content)
+            );
+        } catch (\Throwable $throwable) {
+            throw new NeighbourhoodServiceException(
+                message: 'unable to parse neighbourhood people',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $people;
     }
 
     /**
