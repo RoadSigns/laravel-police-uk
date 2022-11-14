@@ -32,7 +32,6 @@ final class NeighbourhoodService
     }
 
     /**
-     * @param string $forceId
      * @return Collection<int, Summary>
      * @throws NeighbourhoodServiceException
      */
@@ -147,8 +146,6 @@ final class NeighbourhoodService
     }
 
     /**
-     * @param string $forceId
-     * @param string $neighbourhoodId
      * @return Collection<int, Priority>
      * @throws NeighbourhoodServiceException
      */
@@ -202,8 +199,6 @@ final class NeighbourhoodService
     }
 
     /**
-     * @param string $forceId
-     * @param string $neighbourhoodId
      * @return Collection<int, Event>
      * @throws NeighbourhoodServiceException
      */
@@ -290,6 +285,10 @@ final class NeighbourhoodService
         return $locateNeighbourhood;
     }
 
+    /**
+     * @return Collection<int, Person>
+     * @throws NeighbourhoodServiceException
+     */
     public function people(string $forceId, string $neighbourhoodId): Collection
     {
         try {
@@ -331,6 +330,10 @@ final class NeighbourhoodService
         return $people;
     }
 
+    /**
+     * @return Collection<int, Boundary>
+     * @throws NeighbourhoodServiceException
+     */
     public function boundary(string $forceId, string $neighbourhoodId): Collection
     {
         try {

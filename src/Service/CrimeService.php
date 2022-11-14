@@ -14,6 +14,8 @@ use RoadSigns\LaravelPoliceUK\Domain\Crimes\Crime;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Exceptions\CrimeServiceException;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Location;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\OutcomeStatus;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Street;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\UnknownLocation;
 
 final class CrimeService
 {
@@ -142,7 +144,7 @@ final class CrimeService
                         category: $crime['category'],
                         context: $crime['context'],
                         month: Carbon::createFromFormat('Y-m', $crime['month']),
-                        location: new Location(
+                        location: new UnknownLocation(
                             title: $crime['location'] ?? '',
                             type: $crime['location_type'] ?? '',
                             subtype: $crime['location_subtype'] ?? ''
@@ -157,6 +159,73 @@ final class CrimeService
         } catch (\Throwable $throwable) {
             throw new CrimeServiceException(
                 message: 'unable to parse crimes with no location',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $crimes;
+    }
+
+    /**
+     * @return Collection<int, Crime>
+     * @throws CrimeServiceException
+     */
+    public function atLocationId(int $locationId, Carbon $date): Collection
+    {
+        try {
+            $response = $this->client->get(
+                sprintf(
+                    'https://data.police.uk/api/crimes-at-location?date=%s&location_id=%s',
+                    $date->format('Y-m'),
+                    $locationId
+                )
+            );
+        } catch (GuzzleException $guzzleException) {
+            throw new CrimeServiceException(
+                message: sprintf(
+                    'unable to get crimes at location id %s for date %s',
+                    $locationId,
+                    $date->format('Y-m')
+                ),
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
+        }
+
+        $content = $this->getJsonDecode($response);
+
+        try {
+            $crimes = new Collection(
+                array_map(static function (array $crime) {
+                    return new Crime(
+                        id: $crime['id'],
+                        persistentId: $crime['persistent_id'],
+                        category: $crime['category'],
+                        context: $crime['context'],
+                        month: Carbon::createFromFormat('Y-m', $crime['month']),
+                        location: new Location(
+                            latitude: (float) $crime['location']['latitude'],
+                            longitude: (float) $crime['location']['longitude'],
+                            street: new Street(
+                                id: (int) $crime['location']['street']['id'],
+                                name: $crime['location']['street']['name']
+                            )
+                        ),
+                        outcomeStatus: new OutcomeStatus(
+                            category: $crime['outcome_status']['category'],
+                            date: Carbon::createFromFormat('Y-m', $crime['outcome_status']['date'])
+                        )
+                    );
+                }, $content)
+            );
+        } catch (\Throwable $throwable) {
+            throw new CrimeServiceException(
+                message: sprintf(
+                    'unable to parse crimes at location id %s for date %s',
+                    $locationId,
+                    $date->format('Y-m')
+                ),
                 code: $throwable->getCode(),
                 previous: $throwable
             );

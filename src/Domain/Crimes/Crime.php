@@ -7,6 +7,7 @@ namespace RoadSigns\LaravelPoliceUK\Domain\Crimes;
 use Carbon\Carbon;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Location;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\OutcomeStatus;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\UnknownLocation;
 
 final class Crime
 {
@@ -20,26 +21,17 @@ final class Crime
 
     private Carbon $month;
 
-    private Location $location;
+    private UnknownLocation|Location $location;
 
     private OutcomeStatus $outcomeStatus;
 
-    /**
-     * @param int $id
-     * @param string $persistentId
-     * @param string $category
-     * @param string $context
-     * @param Carbon $month
-     * @param Location $location
-     * @param OutcomeStatus $outcomeStatus
-     */
     public function __construct(
         int $id,
         string $persistentId,
         string $category,
         string $context,
         Carbon $month,
-        Location $location,
+        UnknownLocation|Location $location,
         OutcomeStatus $outcomeStatus
     ) {
         $this->id = $id;
@@ -76,7 +68,7 @@ final class Crime
         return $this->month;
     }
 
-    public function location(): Location
+    public function location(): UnknownLocation|Location
     {
         return $this->location;
     }

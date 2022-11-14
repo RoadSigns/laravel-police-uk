@@ -6,31 +6,31 @@ namespace RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject;
 
 final class Location
 {
-    private string $title;
+    private float $latitude;
 
-    private string $type;
+    private float $longitude;
 
-    private string $subtype;
+    private Street $street;
 
-    public function __construct(string $title, string $type, string $subtype)
+    public function __construct(float $latitude, float $longitude, Street $street)
     {
-        $this->title = $title;
-        $this->type = $type;
-        $this->subtype = $subtype;
+        $this->latitude = $latitude;
+        $this->longitude = $longitude;
+        $this->street = $street;
     }
 
-    public function title(): string
+    public function latitude(): float
     {
-        return $this->title;
+        return $this->latitude;
     }
 
-    public function type(): string
+    public function longitude(): float
     {
-        return $this->type;
+        return $this->longitude;
     }
 
-    public function subtype(): string
+    public function street(): Street
     {
-        return $this->subtype;
+        return $this->street;
     }
 }
