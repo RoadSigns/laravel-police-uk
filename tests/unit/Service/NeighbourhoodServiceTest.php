@@ -592,4 +592,106 @@ final class NeighbourhoodServiceTest extends TestCase
         $this->assertSame('Andy Cooper', $people[0]->name());
         $this->assertSame('Andy Price', $people[1]->name());
     }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToGetNeighbourhoodBoundary(): void
+    {
+        $this->expectException(NeighbourhoodServiceException::class);
+        $this->expectExceptionMessage(
+            'unable to find boundary for force leicestershire and neighbourhood NC04'
+        );
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/leicestershire/NC04/boundary')
+            ->willThrowException($this->createMock(GuzzleException::class));
+
+        $service = new NeighbourhoodService($client);
+        $service->boundary('leicestershire', 'NC04');
+    }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToParseNeighbourhoodBoundary(): void
+    {
+        $this->expectException(NeighbourhoodServiceException::class);
+        $this->expectExceptionMessage('unable to decode json');
+
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/leicestershire/NC04/boundary')
+            ->willReturn($response);
+
+        $service = new NeighbourhoodService($client);
+        $service->boundary('leicestershire', 'NC04');
+    }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToParseNeighbourhoodBoundaryInformation(): void
+    {
+        $this->expectException(NeighbourhoodServiceException::class);
+        $this->expectExceptionMessage('unable to parse neighbourhood boundary');
+
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"}');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/leicestershire/NC04/boundary')
+            ->willReturn($response);
+
+        $service = new NeighbourhoodService($client);
+        $service->boundary('leicestershire', 'NC04');
+    }
+
+    /** @test */
+    public function returnsNeighbourhoodBoundary(): void
+    {
+        $json = '[
+            {
+                "latitude": "52.6394052587",
+                "longitude": "-1.1458618876"
+            },
+            {
+                "latitude": "52.6389452755",
+                "longitude": "-1.1457057759"
+            },
+            {
+                "latitude": "52.6383706746",
+                "longitude": "-1.1455755443"
+            }
+        ]';
+
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn($json);
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createMock(Client::class);
+        $client->expects($this->once())
+            ->method('get')
+            ->with('https://data.police.uk/api/leicestershire/NC04/boundary')
+            ->willReturn($response);
+
+        $service = new NeighbourhoodService($client);
+        $boundary = $service->boundary('leicestershire', 'NC04');
+
+        $this->assertCount(3, $boundary);
+        $this->assertSame(52.6394052587, $boundary[0]->latitude());
+        $this->assertSame(-1.1458618876, $boundary[0]->longitude());
+
+    }
+
 }

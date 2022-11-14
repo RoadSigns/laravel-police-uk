@@ -9,6 +9,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Collection;
 use Psr\Http\Message\ResponseInterface;
+use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Boundary;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Event;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\Exceptions\NeighbourhoodServiceException;
 use RoadSigns\LaravelPoliceUK\Domain\Neighbourhoods\LocateNeighbourhood;
@@ -328,6 +329,46 @@ final class NeighbourhoodService
         }
 
         return $people;
+    }
+
+    public function boundary(string $forceId, string $neighbourhoodId): Collection
+    {
+        try {
+            $response = $this->client->get(
+                sprintf('https://data.police.uk/api/%s/%s/boundary', $forceId, $neighbourhoodId)
+            );
+        } catch (GuzzleException $guzzleException) {
+            throw new NeighbourhoodServiceException(
+                message: sprintf(
+                    'unable to find boundary for force %s and neighbourhood %s',
+                    $forceId,
+                    $neighbourhoodId
+                ),
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
+        }
+
+        $content = $this->getJsonDecode($response);
+
+        try {
+            $boundary = new Collection(
+                array_map(static function (array $boundary) {
+                    return new Boundary(
+                        latitude: (float) $boundary['latitude'],
+                        longitude: (float) $boundary['longitude']
+                    );
+                }, $content)
+            );
+        } catch (\Throwable $throwable) {
+            throw new NeighbourhoodServiceException(
+                message: 'unable to parse neighbourhood boundary',
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $boundary;
     }
 
     /**
