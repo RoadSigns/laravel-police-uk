@@ -691,7 +691,5 @@ final class NeighbourhoodServiceTest extends TestCase
         $this->assertCount(3, $boundary);
         $this->assertSame(52.6394052587, $boundary[0]->latitude());
         $this->assertSame(-1.1458618876, $boundary[0]->longitude());
-
     }
-
 }
