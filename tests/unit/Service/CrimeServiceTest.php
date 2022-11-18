@@ -14,6 +14,8 @@ use RoadSigns\LaravelPoliceUK\Domain\Crimes\Category;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Crime;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Exceptions\CrimeServiceException;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Location;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Outcome;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Street;
 use RoadSigns\LaravelPoliceUK\Service\CrimeService;
 
 final class CrimeServiceTest extends TestCase
@@ -521,5 +523,142 @@ final class CrimeServiceTest extends TestCase
         $this->assertSame("Investigation complete; no suspect identified", $crime->outcomeStatus()->category());
         $this->assertSame("2017-03", $crime->outcomeStatus()->date()->format('Y-m'));
         $this->assertInstanceOf(Location::class, $crime->location());
+    }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToGetCrimeOutcome(): void
+    {
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willThrowException(
+                $this->createMock(GuzzleException::class)
+            );
+
+        $this->expectException(CrimeServiceException::class);
+        $this->expectExceptionMessage('unable to get outcome for crime id 56862854');
+
+        $crimeService = new CrimeService($client);
+        $crimeService->outcome("56862854");
+    }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToParseCrimeOutcome(): void
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $this->expectException(CrimeServiceException::class);
+        $this->expectExceptionMessage('unable to parse json response');
+
+        $crimeService = new CrimeService($client);
+        $crimeService->outcome("56862854");
+    }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToParseCrimeOutcomeResponse(): void
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"}');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $this->expectException(CrimeServiceException::class);
+        $this->expectExceptionMessage('unable to parse outcome for crime id 56862854');
+
+        $crimeService = new CrimeService($client);
+        $crimeService->outcome("56862854");
+    }
+
+    /** @test */
+    public function canGetTheCrimeOutcome(): void
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn(
+            '
+            {
+                "crime": {
+                    "category": "violent-crime", 
+                    "persistent_id": "590d68b69228a9ff95b675bb4af591b38de561aa03129dc09a03ef34f537588c", 
+                    "location_subtype": "", 
+                    "location_type": "Force", 
+                    "location": {
+                        "latitude": "52.639814", 
+                        "street": {
+                            "id": 883235, 
+                            "name": "On or near Sanvey Gate"
+                        }, 
+                        "longitude": "-1.139118"
+                    }, 
+                    "context": "", 
+                    "month": "2017-05", 
+                    "id": 56880258
+                }, 
+                "outcomes": [
+                    {
+                        "category": {
+                            "code": "under-investigation", 
+                            "name": "Under investigation"
+                        }, 
+                        "date": "2017-05", 
+                        "person_id": null
+                    }, 
+                    {
+                        "category": {
+                            "code": "formal-action-not-in-public-interest", 
+                            "name": "Formal action is not in the public interest"
+                        }, 
+                        "date": "2017-06", 
+                        "person_id": null
+                    }
+                ]
+            }
+        '
+        );
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $crimeService = new CrimeService($client);
+        $outcome = $crimeService->outcome("56880258");
+
+        $this->assertSame(56880258, $outcome->crime()->id());
+        $this->assertSame("violent-crime", $outcome->crime()->category());
+        $this->assertSame("", $outcome->crime()->context());
+        $this->assertSame("2017-05", $outcome->crime()->month()->format('Y-m'));
+        $this->assertInstanceOf(Location::class, $outcome->crime()->location());
+        $this->assertSame(52.639814, $outcome->crime()->location()->latitude());
+        $this->assertSame(-1.139118, $outcome->crime()->location()->longitude());
+        $this->assertInstanceOf(Street::class, $outcome->crime()->location()->street());
+        $this->assertSame(883235, $outcome->crime()->location()->street()->id());
+        $this->assertSame("On or near Sanvey Gate", $outcome->crime()->location()->street()->name());
+
+        $this->assertSame(2, $outcome->outcomes()->count());
+
+        /** @var Outcome $firstOutcome */
+        $firstOutcome = $outcome->outcomes()->first();
+        $this->assertSame("under-investigation", $firstOutcome->category()->code());
+        $this->assertSame("Under investigation", $firstOutcome->category()->name());
+        $this->assertSame("2017-05", $firstOutcome->date()->format('Y-m'));
+        $this->assertNull($firstOutcome->personId());
     }
 }

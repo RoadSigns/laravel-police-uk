@@ -12,7 +12,10 @@ use Psr\Http\Message\ResponseInterface;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Category;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Crime;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Exceptions\CrimeServiceException;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\Outcome;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Location;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Outcome as OutcomeItem;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\OutcomeCategory;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\OutcomeStatus;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Street;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\UnknownLocation;
@@ -232,6 +235,73 @@ final class CrimeService
         }
 
         return $crimes;
+    }
+
+    public function outcome(string $crimeId): Outcome
+    {
+        try {
+            $response = $this->client->get(
+                sprintf(
+                    'https://data.police.uk/api/outcomes-for-crime/%s',
+                    $crimeId
+                )
+            );
+        } catch (GuzzleException $guzzleException) {
+            throw new CrimeServiceException(
+                message: sprintf(
+                    'unable to get outcome for crime id %s',
+                    $crimeId
+                ),
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
+        }
+
+        $content = $this->getJsonDecode($response);
+
+        try {
+            $outcome = new Outcome(
+                crime: new Crime(
+                    id: $content['crime']['id'],
+                    persistentId: $content['crime']['persistent_id'],
+                    category: $content['crime']['category'],
+                    context: $content['crime']['context'],
+                    month: Carbon::createFromFormat('Y-m', $content['crime']['month']),
+                    location: new Location(
+                        latitude: (float) $content['crime']['location']['latitude'],
+                        longitude: (float) $content['crime']['location']['longitude'],
+                        street: new Street(
+                            id: (int) $content['crime']['location']['street']['id'],
+                            name: $content['crime']['location']['street']['name']
+                        )
+                    ),
+                    outcomeStatus: null
+                ),
+                outcomes: new Collection(
+                    array_map(static function (array $outcome) {
+                        return new OutcomeItem(
+                            category: new OutcomeCategory(
+                                code: $outcome['category']['code'],
+                                name: $outcome['category']['name']
+                            ),
+                            date: Carbon::createFromFormat('Y-m', $outcome['date']),
+                            personId: $outcome['person_id'] ?? null,
+                        );
+                    }, $content['outcomes'])
+                )
+            );
+        } catch (\Throwable $throwable) {
+            throw new CrimeServiceException(
+                message: sprintf(
+                    'unable to parse outcome for crime id %s',
+                    $crimeId
+                ),
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $outcome;
     }
 
     /**

@@ -23,7 +23,7 @@ final class Crime
 
     private UnknownLocation|Location $location;
 
-    private OutcomeStatus $outcomeStatus;
+    private ?OutcomeStatus $outcomeStatus;
 
     public function __construct(
         int $id,
@@ -32,7 +32,7 @@ final class Crime
         string $context,
         Carbon $month,
         UnknownLocation|Location $location,
-        OutcomeStatus $outcomeStatus
+        ?OutcomeStatus $outcomeStatus
     ) {
         $this->id = $id;
         $this->persistentId = $persistentId;
@@ -73,7 +73,7 @@ final class Crime
         return $this->location;
     }
 
-    public function outcomeStatus(): OutcomeStatus
+    public function outcomeStatus(): ?OutcomeStatus
     {
         return $this->outcomeStatus;
     }
