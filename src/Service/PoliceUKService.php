@@ -21,7 +21,7 @@ final class PoliceUKService
         $this->forceService = new ForceService($client);
         $this->crimeService = new CrimeService($client);
         $this->neighbourhoodService = new NeighbourhoodService($client);
-        $this->stopAndSearchService = new StopAndSearchService();
+        $this->stopAndSearchService = new StopAndSearchService($client);
     }
 
     public function forces(): ForceService
