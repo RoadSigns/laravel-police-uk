@@ -10,6 +10,7 @@ use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Collection;
 use Psr\Http\Message\ResponseInterface;
 use RoadSigns\LaravelPoliceUK\Domain\StopAndSearches\Exceptions\StopAndSearchServiceException;
+use RoadSigns\LaravelPoliceUK\Domain\StopAndSearches\Stop;
 
 final class StopAndSearchService
 {
@@ -42,9 +43,35 @@ final class StopAndSearchService
 
         $content = $this->getJsonDecode($response);
 
-        
+        try {
+            $stopAndSearches = new Collection(array_map(static function (array $stops) {
+                return new Stop(
+                    type: $stops['type'],
+                    dateTime: Carbon::parse($stops['datetime']),
+                    ageRange: $stops['age_range'],
+                    gender: $stops['gender'],
+                    involvedPerson: $stops['involved_person'],
+                    selfDefinedEthnicity: $stops['self_defined_ethnicity'],
+                    removalOfMoreThanOuterClothing: $stops['removal_of_more_than_outer_clothing'],
+                    officerDefinedEthnicity: $stops['officer_defined_ethnicity'],
+                    objectOfSearch: $stops['object_of_search'],
+                    legislation: $stops['legislation'],
+                    location: $stops['location'],
+                    operation: $stops['operation'],
+                    operationName: $stops['operation_name'],
+                    outcome: $stops['outcome'],
+                    outcomeLinkedToObjectOfSearch: $stops['outcome_linked_to_object_of_search']
+                );
+            }, $content));
+        } catch (\Throwable $throwable) {
+            throw new StopAndSearchServiceException(
+                message: sprintf('unable to parse stop and searches with no location with id of %s', $forceId),
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
 
-        return new Collection();
+        return $stopAndSearches;
     }
 
     /**
