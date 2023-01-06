@@ -13,9 +13,11 @@ use Psr\Http\Message\ResponseInterface;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Category;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Crime;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\Exceptions\CrimeServiceException;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\StreetCrime;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Location;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Outcome;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Street;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\StreetLocation;
 use RoadSigns\LaravelPoliceUK\Service\CrimeService;
 
 final class CrimeServiceTest extends TestCase
@@ -660,5 +662,292 @@ final class CrimeServiceTest extends TestCase
         $this->assertSame("Under investigation", $firstOutcome->category()->name());
         $this->assertSame("2017-05", $firstOutcome->date()->format('Y-m'));
         $this->assertNull($firstOutcome->personId());
+    }
+
+    /** @test */
+    public function throwsAnExceptionWhenUnableToGetStreetAtLocation(): void
+    {
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willThrowException(
+                $this->createMock(GuzzleException::class)
+            );
+
+        $this->expectException(CrimeServiceException::class);
+        $this->expectExceptionMessage(
+            'unable to get street level crime for longitude 10.1 and latitude 11.2 for date 2022-01'
+        );
+
+        $crimeService = new CrimeService($client);
+        $crimeService->streetLevelCrimeInLocation(
+            10.1,
+            11.2,
+            Carbon::createFromFormat('Y-m', '2022-01')
+        );
+    }
+
+    /** @test */
+    public function throwsAnExceptionWhenUnableToParseStreetAtLocation(): void
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn('{"hello":"world"');
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $this->expectException(CrimeServiceException::class);
+        $this->expectExceptionMessage('unable to parse json response');
+
+        $crimeService = new CrimeService($client);
+        $crimeService->streetLevelCrimeInLocation(
+            10.1,
+            11.2,
+            Carbon::createFromFormat('Y-m', '2022-01')
+        );
+    }
+
+    /** @test */
+    public function throwsExceptionWhenUnableToParseStreetCrimeAtLocationResponse(): void
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn(
+            '
+            [
+                {
+                    "category": "anti-social-behaviour", 
+                    "location_type": "Force", 
+                    "location": {
+                        "latitude": "52.639814", 
+                        "street": {
+                            "id": 883235, 
+                            "name": "On or near Sanvey Gate"
+                        }, 
+                        "longitude": "-1.139118"
+                    }, 
+                    "context": "", 
+                    "month": "2017-05", 
+                    "id": 56880258
+                }
+            ]
+        '
+        );
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $this->expectException(CrimeServiceException::class);
+        $this->expectExceptionMessage(
+            'unable to parse street level crime for longitude 10.1 and latitude 11.2 for date 2022-01'
+        );
+
+        $crimeService = new CrimeService($client);
+        $crimeService->streetLevelCrimeInLocation(
+            10.1,
+            11.2,
+            Carbon::createFromFormat('Y-m', '2022-01')
+        );
+    }
+
+    /** @test */
+    public function canGetStreetCrimeAtLocation()
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn(
+            '
+            [
+                {
+                    "category": "anti-social-behaviour",
+                    "location_type": "Force",
+                    "location": {
+                        "latitude": "52.640961",
+                        "street": {
+                            "id": 884343,
+                            "name": "On or near Wharf Street North"
+                        },
+                        "longitude": "-1.126371"
+                    },
+                    "context": "",
+                    "outcome_status": null,
+                    "persistent_id": "",
+                    "id": 54164419,
+                    "location_subtype": "",
+                    "month": "2017-01"
+                }
+            ]
+        '
+        );
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $crimeService = new CrimeService($client);
+        $streetCrime = $crimeService->streetLevelCrimeInLocation(
+            10.1,
+            11.2,
+            Carbon::createFromFormat('Y-m', '2022-01')
+        );
+
+        $this->assertSame(1, $streetCrime->count());
+
+        /** @var StreetCrime $firstStreetCrime */
+        $firstStreetCrime = $streetCrime->first();
+        $this->assertSame("anti-social-behaviour", $firstStreetCrime->category());
+        $this->assertSame("Force", $firstStreetCrime->location()->type());
+        $this->assertSame("", $firstStreetCrime->context());
+        $this->assertSame("2017-01", $firstStreetCrime->month()->format('Y-m'));
+        $this->assertInstanceOf(StreetLocation::class, $firstStreetCrime->location());
+        $this->assertSame(52.640961, $firstStreetCrime->location()->latitude());
+        $this->assertSame(-1.126371, $firstStreetCrime->location()->longitude());
+        $this->assertInstanceOf(Street::class, $firstStreetCrime->location()->street());
+        $this->assertSame(884343, $firstStreetCrime->location()->street()->id());
+        $this->assertSame("On or near Wharf Street North", $firstStreetCrime->location()->street()->name());
+        $this->assertNull($firstStreetCrime->outcomeStatus());
+    }
+
+    /** @test */
+    public function canGetStreetCrimeAtLocationWhenOutcomeStatusIsPopulated()
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn(
+            '
+            [
+                {
+                    "category": "anti-social-behaviour",
+                    "location_type": "Force",
+                    "location": {
+                        "latitude": "52.640961",
+                        "street": {
+                            "id": 884343,
+                            "name": "On or near Wharf Street North"
+                        },
+                        "longitude": "-1.126371"
+                    },
+                    "context": "",
+                    "outcome_status": {
+                        "category": "awaiting-court-result",
+                        "date": "2017-01"
+                    },
+                    "persistent_id": "123456789",
+                    "id": 54164419,
+                    "location_subtype": "",
+                    "month": "2017-01"
+                }
+            ]
+        '
+        );
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $crimeService = new CrimeService($client);
+        $streetCrime = $crimeService->streetLevelCrimeInLocation(
+            10.1,
+            11.2,
+            Carbon::createFromFormat('Y-m', '2022-01')
+        );
+
+        $this->assertSame(1, $streetCrime->count());
+
+        /** @var StreetCrime $firstStreetCrime */
+        $firstStreetCrime = $streetCrime->first();
+        $this->assertSame(54164419, $firstStreetCrime->id());
+        $this->assertSame('123456789', $firstStreetCrime->persistentId());
+        $this->assertSame("anti-social-behaviour", $firstStreetCrime->category());
+        $this->assertSame("Force", $firstStreetCrime->location()->type());
+        $this->assertSame("", $firstStreetCrime->context());
+        $this->assertSame("2017-01", $firstStreetCrime->month()->format('Y-m'));
+        $this->assertInstanceOf(StreetLocation::class, $firstStreetCrime->location());
+        $this->assertSame(52.640961, $firstStreetCrime->location()->latitude());
+        $this->assertSame(-1.126371, $firstStreetCrime->location()->longitude());
+        $this->assertInstanceOf(Street::class, $firstStreetCrime->location()->street());
+        $this->assertSame(884343, $firstStreetCrime->location()->street()->id());
+        $this->assertSame("On or near Wharf Street North", $firstStreetCrime->location()->street()->name());
+        $this->assertSame("awaiting-court-result", $firstStreetCrime->outcomeStatus()->category());
+        $this->assertSame("2017-01", $firstStreetCrime->outcomeStatus()->date()->format('Y-m'));
+    }
+
+
+    /** @test */
+    public function canGetStreetCrimeAtLocationWhenNoDateProvided()
+    {
+        $stream = $this->createMock(Stream::class);
+        $stream->method('getContents')->willReturn(
+            '
+            [
+                {
+                    "category": "anti-social-behaviour",
+                    "location_type": "Force",
+                    "location": {
+                        "latitude": "52.640961",
+                        "street": {
+                            "id": 884343,
+                            "name": "On or near Wharf Street North"
+                        },
+                        "longitude": "-1.126371"
+                    },
+                    "context": "",
+                    "outcome_status": {
+                        "category": "awaiting-court-result",
+                        "date": "2017-01"
+                    },
+                    "persistent_id": "123456789",
+                    "id": 54164419,
+                    "location_subtype": "",
+                    "month": "2017-01"
+                }
+            ]
+        '
+        );
+
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getBody')->willReturn($stream);
+
+        $client = $this->createStub(Client::class);
+        $client
+            ->method('get')
+            ->willReturn($response);
+
+        $crimeService = new CrimeService($client);
+        $streetCrime = $crimeService->streetLevelCrimeInLocation(10.1, 11.2);
+
+        $this->assertSame(1, $streetCrime->count());
+
+        /** @var StreetCrime $firstStreetCrime */
+        $firstStreetCrime = $streetCrime->first();
+        $this->assertSame(54164419, $firstStreetCrime->id());
+        $this->assertSame('123456789', $firstStreetCrime->persistentId());
+        $this->assertSame("anti-social-behaviour", $firstStreetCrime->category());
+        $this->assertSame("Force", $firstStreetCrime->location()->type());
+        $this->assertSame("", $firstStreetCrime->context());
+        $this->assertSame("2017-01", $firstStreetCrime->month()->format('Y-m'));
+        $this->assertInstanceOf(StreetLocation::class, $firstStreetCrime->location());
+        $this->assertSame(52.640961, $firstStreetCrime->location()->latitude());
+        $this->assertSame(-1.126371, $firstStreetCrime->location()->longitude());
+        $this->assertInstanceOf(Street::class, $firstStreetCrime->location()->street());
+        $this->assertSame(884343, $firstStreetCrime->location()->street()->id());
+        $this->assertSame("On or near Wharf Street North", $firstStreetCrime->location()->street()->name());
+        $this->assertSame("awaiting-court-result", $firstStreetCrime->outcomeStatus()->category());
+        $this->assertSame("2017-01", $firstStreetCrime->outcomeStatus()->date()->format('Y-m'));
     }
 }
