@@ -18,6 +18,7 @@ use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Location;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Outcome as OutcomeItem;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\OutcomeCategory;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\OutcomeStatus;
+use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Point;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\Street;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\StreetLocation;
 use RoadSigns\LaravelPoliceUK\Domain\Crimes\ValueObject\UnknownLocation;
@@ -310,8 +311,8 @@ final class CrimeService
     /**
      * @param float $longitude
      * @param float $latitude
-     * @param Carbon $date
-     * @return Collection<int, StreetCrime>
+     * @param Carbon|null $date
+     * @return Collection
      * @throws CrimeServiceException
      */
     public function streetLevelCrimeInLocation(float $longitude, float $latitude, Carbon $date = null): Collection
@@ -381,6 +382,93 @@ final class CrimeService
                     'unable to parse street level crime for longitude %s and latitude %s for date %s',
                     $longitude,
                     $latitude,
+                    $date->format('Y-m')
+                ),
+                code: $throwable->getCode(),
+                previous: $throwable
+            );
+        }
+
+        return $crimes;
+    }
+
+    /**
+     * @param array<int|string, Point> $points
+     * @param Carbon|null $date
+     * @return Collection
+     * @throws CrimeServiceException
+     */
+    public function streetLevelCrimeInCustomLocation(array $points, Carbon $date = null): Collection
+    {
+        if ($date === null) {
+            $date = Carbon::now();
+        }
+
+        $polyPath = '';
+        foreach ($points as $point) {
+            if (!$point instanceof Point) {
+                continue;
+            }
+
+            $polyPath .= sprintf('%s,%s:', $point->latitude(), $point->longitude());
+        }
+
+        try {
+            $response = $this->client->get(
+                sprintf(
+                    'https://data.police.uk/api/crimes-street/all-crime?poly=%s&date=%s',
+                    rtrim($polyPath, ':'),
+                    $date->format('Y-m')
+                )
+            );
+        } catch (GuzzleException $guzzleException) {
+            throw new CrimeServiceException(
+                message: sprintf(
+                    'unable to get street level crime for custom location for date %s',
+                    $date->format('Y-m')
+                ),
+                code: $guzzleException->getCode(),
+                previous: $guzzleException
+            );
+        }
+
+        $content = $this->getJsonDecode($response);
+
+        try {
+            $crimes = new Collection(
+                array_map(static function (array $crime) {
+                    $outcomeStatus = null;
+                    if ($crime['outcome_status'] !== null) {
+                        $outcomeStatus = new OutcomeStatus(
+                            category: $crime['outcome_status']['category'],
+                            date: Carbon::createFromFormat('Y-m', $crime['outcome_status']['date'])
+                        );
+                    }
+
+                    return new StreetCrime(
+                        id: $crime['id'],
+                        persistentId: $crime['persistent_id'],
+                        category: $crime['category'],
+                        context: $crime['context'],
+                        month: Carbon::createFromFormat('Y-m', $crime['month']),
+                        location: new StreetLocation(
+                            type: $crime['location_type'],
+                            subtype: $crime['location_subtype'],
+                            latitude: (float) $crime['location']['latitude'],
+                            longitude: (float) $crime['location']['longitude'],
+                            street: new Street(
+                                id: (int) $crime['location']['street']['id'],
+                                name: $crime['location']['street']['name']
+                            )
+                        ),
+                        outcomeStatus: $outcomeStatus
+                    );
+                }, $content)
+            );
+        } catch (\Throwable $throwable) {
+            throw new CrimeServiceException(
+                message: sprintf(
+                    'unable to parse street level crime for custom location for date %s',
                     $date->format('Y-m')
                 ),
                 code: $throwable->getCode(),
